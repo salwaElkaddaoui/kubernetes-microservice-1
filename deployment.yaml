@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yolo-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yolo
+  template:
+    metadata:
+      labels:
+        app: yolo
+    spec:
+      containers:
+        - name: yolo-container
+          image: ultralytics/ultralytics:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: FLASK_APP
+              value: "app.py"
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              python3 -m pip install flask
+              echo "Starting Flask server..."
+              python3 -c "
+              from flask import Flask, request, send_file
+              from ultralytics import YOLO
+              import os
+
+              app = Flask(__name__)
+              app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB limit
+              model = YOLO('yolo11n.pt')
+
+              @app.route('/upload', methods=['POST'])
+              def upload():
+                  if 'file' not in request.files:
+                      print('No file part in the request')
+                      return 'No file uploaded', 400
+
+                  file = request.files['file']
+                  if file.filename == '':
+                      print('No file selected')
+                      return 'No file selected', 400
+
+                  print(f'File received: {file.filename}')
+                  input_path = '/input/image.jpg'
+                  file.save(input_path)
+                  print('File uploaded successfully')
+
+                  try:
+                      results = model(input_path)
+                      output_path = '/output/detected_image.jpg'
+                      results[0].save(filename=output_path)
+                      print('Saving detection results')
+                      return send_file(output_path, mimetype='image/jpeg')
+                  except Exception as e:
+                      print(f'Error during detection: {str(e)}')
+                      return f'Error during detection: {str(e)}', 500
+
+              if __name__ == '__main__':
+                  app.run(host='0.0.0.0', port=5000)
+              "
+          volumeMounts:
+            - mountPath: "/input"  # This is where the image will be uploaded
+              name: image-volume
+            - mountPath: "/output"  # This is where the detection result will be stored
+              name: result-volume
+      volumes:
+        - name: image-volume
+          emptyDir: {}
+        - name: result-volume
+          emptyDir: {}
