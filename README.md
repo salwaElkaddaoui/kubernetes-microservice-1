@@ -2,6 +2,8 @@
 
 This microservice provides an HTTP API for object detection in images using the YOLO 11 model. It receives an image via an HTTP POST request, processes it using the YOLO model, and returns the image with detected objects.
 
+![Architecture Description](assets/diagram.png)
+
 ### Deployment
 #### 1. Requirements
 - Minikube
